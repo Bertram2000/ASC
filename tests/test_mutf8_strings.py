@@ -2,6 +2,7 @@ import base64
 import struct
 import unittest
 
+from droidasc.asc_core.core.dex.dex_manager import DexManager
 from droidasc.asc_core.utils.tinydex import DEX, _decode_mutf8_fallback
 
 
@@ -121,6 +122,7 @@ class Mutf8StringTests(unittest.TestCase):
 
     def test_malformed_mutf8_uses_replacement_character(self):
         self.assertEqual(_decode_mutf8_fallback(b"a\xffb"), "a\ufffdb")
+        self.assertEqual(_decode_mutf8_fallback(b"a\xc0\x80\xffb"), "a\x00\ufffdb")
 
     def test_get_class_falls_back_for_utf16_sort_order(self):
         names = ["Ll/\U00010000;", "Ll/\ue000;"]
@@ -129,6 +131,15 @@ class Mutf8StringTests(unittest.TestCase):
         for name in names:
             with self.subTest(name=name):
                 self.assertIsNotNone(dex.get_class(name))
+
+    def test_rebuilt_dex_writes_modified_utf8(self):
+        name = "Lexample/\U0001f600;"
+        data = DexManager(_make_class_dex([name])).extract_and_rebuild(name)
+
+        self.assertIn(b"\xed\xa0\xbd\xed\xb8\x80", data)
+        self.assertNotIn(b"\xf0\x9f\x98\x80", data)
+        dex = DEX.parse(data, "rebuilt.dex")
+        self.assertIn(name, [dex.get_string(i) for i in range(len(dex.strings))])
 
     def test_unterminated_string_is_rejected(self):
         data = bytearray(_make_class_dex(["Lexample/Test;"]))

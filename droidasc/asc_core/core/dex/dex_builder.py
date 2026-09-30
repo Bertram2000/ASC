@@ -1,6 +1,7 @@
 import struct
 import array
 import time
+from mutf8 import encode_modified_utf8
 from ...utils.leb128 import write_uleb128, write_sleb128
 from ...utils.dex_parser import rebuild_annotation_item
 from .dex_remapper import DexIndexMapper
@@ -39,8 +40,9 @@ class DexBuilder:
         for s in self.im.str_restruct:
             string_data_offs.append(len(self.out))
             # MUTF-8 length
-            s_bytes = s.encode('utf-8')
-            self.out.extend(write_uleb128(len(s))) # char length, approx len(s) for ascii
+            s_bytes = encode_modified_utf8(s)
+            # 20260930: use utf-16-le length for string data. Follow-up to MG1937/ASC/issues/33.
+            self.out.extend(write_uleb128(len(s.encode('utf-16-le')) // 2))
             self.out.extend(s_bytes)
             self.out.append(0)
             
